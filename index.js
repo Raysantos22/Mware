@@ -1,8 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const moment = require('moment-timezone');
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
+// const sqlite3 = require('sqlite3').verbose();
+// const { open } = require('sqlite');
 const path = require('path');
 const fs = require('fs');
 const app = express();
@@ -62,7 +62,6 @@ app.use((err, req, res, next) => {
 const API_BASE_URL = 'https://eljin.org/api';
 
 // SQLite Database Setup
-let db;
 const DB_PATH = path.join(__dirname, 'ecpos_data.db');
 
 // Ensure the database directory exists
@@ -75,47 +74,74 @@ if (!fs.existsSync(dbDirectory)) {
 // Database initialization function for attendance only
 // In-memory attendance storage for Vercel
 let attendanceRecords = [];
+let db = null; 
 
 // Simple in-memory database functions
-const attendanceDB = {
-  async insertAttendance(record) {
-    const existingIndex = attendanceRecords.findIndex(
-      r => r.staffId === record.staffId && r.date === record.date
-    );
+const memoryDB = {
+  async run(query, params = []) {
+    console.log('DB operation:', query, params);
     
-    if (existingIndex !== -1) {
-      // Update existing record
-      attendanceRecords[existingIndex] = { ...attendanceRecords[existingIndex], ...record };
-    } else {
-      // Add new record
-      record.id = attendanceRecords.length + 1;
-      record.created_at = new Date().toISOString();
-      attendanceRecords.push(record);
+    if (query.includes('attendance_records') && query.includes('INSERT')) {
+      // Handle attendance insert
+      const [staffId, storeId, date, timeIn, timeOut, breakIn, breakOut, status] = params;
+      const record = {
+        id: Date.now(),
+        staffId,
+        storeId, 
+        date,
+        timeIn,
+        timeOut,
+        breakIn,
+        breakOut,
+        status: status || 'ACTIVE',
+        synced: 0,
+        created_at: new Date().toISOString()
+      };
+      
+      // Check if record exists
+      const existingIndex = attendanceRecords.findIndex(r => r.staffId === staffId && r.date === date);
+      if (existingIndex !== -1) {
+        attendanceRecords[existingIndex] = { ...attendanceRecords[existingIndex], ...record };
+      } else {
+        attendanceRecords.push(record);
+      }
     }
-    return record;
+    
+    return { changes: 1 };
   },
   
-  async getAttendanceForStaffOnDate(staffId, date) {
-    return attendanceRecords.find(r => r.staffId === staffId && r.date === date) || null;
+  async get(query, params = []) {
+    if (query.includes('attendance_records')) {
+      const [staffId, date] = params;
+      return attendanceRecords.find(r => r.staffId === staffId && r.date === date) || null;
+    }
+    return null;
   },
   
-  async getAttendanceForStore(storeId, date) {
-    return attendanceRecords.filter(r => r.storeId === storeId && r.date === date);
+  async all(query, params = []) {
+    if (query.includes('attendance_records')) {
+      return attendanceRecords.filter(r => r.synced === 0);
+    }
+    // Return empty array for other tables to prevent errors
+    return [];
   }
 };
-
-// Replace the database initialization
+// Replace the entire initializeDatabase function:
 async function initializeDatabase() {
   try {
-    console.log('Using in-memory storage for attendance records');
-    console.log('Attendance system initialized successfully');
+    console.log('Using in-memory storage for Vercel compatibility');
+    db = memoryDB; // Assign memory DB to existing db variable
+    console.log('In-memory database initialized successfully');
   } catch (error) {
-    console.error('Initialization error:', error);
+    console.error('Database initialization error:', error);
   }
 }
 // Initialize the database
-// initializeDatabase().catch(console.error);
-
+initializeDatabase().catch(console.error);
+// Initialize database for local development
+if (process.env.NODE_ENV !== 'production') {
+  initializeDatabase().catch(console.error);
+}
 // Helper function for decimal formatting
 function formatDecimal(value) {
   if (value === undefined || value === null || value === '') {
@@ -129,7 +155,11 @@ let storeExpenses = [];
 
 // Background sync function
 async function syncPendingTransactions() {
-  if (!db) return;
+if (!db || process.env.VERCEL) {
+    console.log('Skipping sync in serverless environment');
+    return;
+  }
+  
   
   try {
     // Get pending transactions
