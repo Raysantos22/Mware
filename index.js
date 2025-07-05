@@ -1293,6 +1293,10 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
           }
         }
   
+         const truncateText = (text, maxLength = 50) => {
+        if (!text) return '';
+        return text.length > maxLength ? text.substring(0, maxLength) : text;
+      };
         // Format transaction summary data, cleaning up any duplicate fields
         const summaryData = {
           transactionid: uniqueTransactionId,
@@ -1377,6 +1381,10 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
               }
             }
   
+              if (checkLineError.response && checkLineError.response.status !== 404) {
+              console.error(`Error checking existing line ${record.linenum}:`, checkLineError.message);
+            }
+          }
             const salesTransData = {
               transactionid: uniqueTransactionId,
               linenum: parseInt(record.linenum),
