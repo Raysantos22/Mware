@@ -7,9 +7,18 @@
     "build": "echo 'Build complete'"
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.10.0",
+    "body-parser": "^2.2.0",
+    "express": "^5.1.0",
+    "moment-timezone": "^0.6.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
   },
   "engines": {
     "node": "18.x"
-  }
+  },
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

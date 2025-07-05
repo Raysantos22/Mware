@@ -1,6 +1,5 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const axios = require('axios').default;
 const moment = require('moment-timezone');
 const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
@@ -2110,6 +2109,12 @@ app.get('/api/windowtable/get-all-tables', async (req, res) => {
     }
   });
  });
- 
+ const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 API available at: http://localhost:${PORT}`);
+  console.log(`🔗 Test endpoint: http://localhost:${PORT}/api/getsummary/lapaz`);
+});
  // For Vercel, we need to export the app
  module.exports = app;
