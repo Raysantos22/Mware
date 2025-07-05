@@ -1380,11 +1380,10 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
                 console.error(`Error checking existing line ${record.linenum}:`, checkLineError.message);
               }
             }
-  
-              if (checkLineError.response && checkLineError.response.status !== 404) {
-              console.error(`Error checking existing line ${record.linenum}:`, checkLineError.message);
-            }
-          
+    const truncateText = (text, maxLength = 50) => {
+        if (!text) return '';
+        return text.length > maxLength ? text.substring(0, maxLength) : text;
+      };
             const salesTransData = {
               transactionid: uniqueTransactionId,
               linenum: parseInt(record.linenum),
