@@ -1384,7 +1384,7 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
               if (checkLineError.response && checkLineError.response.status !== 404) {
               console.error(`Error checking existing line ${record.linenum}:`, checkLineError.message);
             }
-          }
+          
             const salesTransData = {
               transactionid: uniqueTransactionId,
               linenum: parseInt(record.linenum),
