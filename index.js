@@ -73,54 +73,46 @@ if (!fs.existsSync(dbDirectory)) {
 
 // Database initialization function
 // Database initialization function for attendance only
+// In-memory attendance storage for Vercel
+let attendanceRecords = [];
+
+// Simple in-memory database functions
+const attendanceDB = {
+  async insertAttendance(record) {
+    const existingIndex = attendanceRecords.findIndex(
+      r => r.staffId === record.staffId && r.date === record.date
+    );
+    
+    if (existingIndex !== -1) {
+      // Update existing record
+      attendanceRecords[existingIndex] = { ...attendanceRecords[existingIndex], ...record };
+    } else {
+      // Add new record
+      record.id = attendanceRecords.length + 1;
+      record.created_at = new Date().toISOString();
+      attendanceRecords.push(record);
+    }
+    return record;
+  },
+  
+  async getAttendanceForStaffOnDate(staffId, date) {
+    return attendanceRecords.find(r => r.staffId === staffId && r.date === date) || null;
+  },
+  
+  async getAttendanceForStore(storeId, date) {
+    return attendanceRecords.filter(r => r.storeId === storeId && r.date === date);
+  }
+};
+
+// Replace the database initialization
 async function initializeDatabase() {
   try {
-    // Open database connection
-    db = await open({
-      filename: DB_PATH,
-      driver: sqlite3.Database
-    });
-    
-    console.log('SQLite database connected at:', DB_PATH);
-    
-    // Create attendance table if it doesn't exist
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS attendance_records (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        staffId TEXT NOT NULL,
-        storeId TEXT NOT NULL,
-        date TEXT NOT NULL,
-        timeIn TEXT,
-        timeInPhoto TEXT,
-        breakIn TEXT,
-        breakInPhoto TEXT,
-        breakOut TEXT,
-        breakOutPhoto TEXT,
-        timeOut TEXT,
-        timeOutPhoto TEXT,
-        status TEXT DEFAULT 'ACTIVE',
-        synced INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(staffId, date)
-      )
-    `);
-    
-    // Create indexes for faster lookups
-    await db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_attendance_staff_date ON attendance_records(staffId, date);
-      CREATE INDEX IF NOT EXISTS idx_attendance_store ON attendance_records(storeId);
-      CREATE INDEX IF NOT EXISTS idx_attendance_synced ON attendance_records(synced);
-    `);
-    
-    console.log('Attendance database table initialized successfully');
+    console.log('Using in-memory storage for attendance records');
+    console.log('Attendance system initialized successfully');
   } catch (error) {
-    console.error('Database initialization error:', error);
-    console.log('Continuing without local database...');
-    // Don't throw error, just continue without database
+    console.error('Initialization error:', error);
   }
 }
-
 // Initialize the database
 // initializeDatabase().catch(console.error);
 
