@@ -1466,7 +1466,7 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
               taxamount: parseFloat(record.taxamount || 0).toFixed(2),
               
               createddate: record.createddate || new Date().toISOString(),
-              remarks: String(record.remarks || ''),
+              remarks: String(record.comment || ''),
               taxinclinprice: parseFloat(record.taxamount || 0).toFixed(2),
               description: String(record.description || ''),
               
