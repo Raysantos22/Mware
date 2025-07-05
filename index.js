@@ -12,13 +12,12 @@ const multer = require('multer');
 const FormData = require('form-data');
 
 const upload = multer({
-  dest: 'uploads/temp/', // Temporary directory for uploaded files
+  storage: multer.memoryStorage(), // Use memory instead of disk
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
     fieldSize: 10 * 1024 * 1024
   }
 });
-
 // Configure body-parser to handle JSON with increased size limit
 app.use(bodyParser.json({limit: '10mb'}));
 app.use(bodyParser.urlencoded({extended: true, limit: '10mb'}));
@@ -268,8 +267,9 @@ if (!db || process.env.VERCEL) {
 }
 
 // Run the sync process every 5 minutes
-setInterval(syncPendingTransactions, 5 * 60 * 1000);
-
+if (!process.env.VERCEL) {
+  setInterval(syncPendingTransactions, 5 * 60 * 1000);
+}
 // Root route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the ECPOS backend server with SQLite persistence!' });
@@ -2019,11 +2019,17 @@ app.get('/api/windowtable/get-all-tables', async (req, res) => {
  });
  
  // Attendance endpoint
+// Attendance endpoint
 app.post('/api/attendance', upload.single('photo'), async (req, res) => {
   try {
     console.log('Received attendance request');
     console.log('Body:', req.body);
-    console.log('File:', req.file);
+    console.log('File info:', req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    } : 'No file');
 
     // Validate required fields
     const { staffId, storeId, date, time, type } = req.body;
@@ -2057,8 +2063,8 @@ app.post('/api/attendance', upload.single('photo'), async (req, res) => {
     formData.append('time', time);
     formData.append('type', type);
     
-    // Append the photo file
-    formData.append('photo', fs.createReadStream(req.file.path), {
+    // For memory storage, use buffer instead of file stream
+    formData.append('photo', req.file.buffer, {
       filename: req.file.originalname || 'photo.jpg',
       contentType: req.file.mimetype || 'image/jpeg'
     });
@@ -2080,29 +2086,11 @@ app.post('/api/attendance', upload.single('photo'), async (req, res) => {
 
     console.log('Laravel response:', response.data);
 
-    // Clean up temporary file
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up temp file:', cleanupError);
-      }
-    }
-
     // Send back the response
     res.status(200).json(response.data);
     
   } catch (error) {
     console.error('Error in attendance endpoint:', error);
-    
-    // Clean up temporary file on error
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up temp file:', cleanupError);
-      }
-    }
 
     // Handle axios errors specifically
     if (error.response) {
@@ -2119,10 +2107,7 @@ app.post('/api/attendance', upload.single('photo'), async (req, res) => {
 });
 
 // Make sure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads', 'temp');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+
  const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
