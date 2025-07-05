@@ -1,8 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const moment = require('moment-timezone');
-// const sqlite3 = require('sqlite3').verbose();
-// const { open } = require('sqlite');
+const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
 const path = require('path');
 const fs = require('fs');
 const app = express();
@@ -72,6 +72,7 @@ if (!fs.existsSync(dbDirectory)) {
 }
 
 // Database initialization function
+// Database initialization function for attendance only
 async function initializeDatabase() {
   try {
     // Open database connection
@@ -82,136 +83,46 @@ async function initializeDatabase() {
     
     console.log('SQLite database connected at:', DB_PATH);
     
-    // Create tables if they don't exist
+    // Create attendance table if it doesn't exist
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS rbotransactiontables (
-        transactionid TEXT PRIMARY KEY,
-        receiptid TEXT,
-        store TEXT,
-        type TEXT,
-        staff TEXT,
-        custaccount TEXT,
-        cashamount TEXT,
-        netamount TEXT,
-        costamount TEXT,
-        grossamount TEXT,
-        partialpayment TEXT,
-        transactionstatus INTEGER,
-        discamount TEXT,
-        custdiscamount TEXT,
-        totaldiscamount TEXT,
-        numberofitems INTEGER,
-        currency TEXT,
-        createddate TEXT,
-        zReportid TEXT,
-        taxinclinprice TEXT,
-        netamountnotincltax TEXT,
-        window_number INTEGER,
-        charge TEXT,
-        gcash TEXT,
-        paymaya TEXT,
-        cash TEXT,
-        card TEXT,
-        loyaltycard TEXT,
-        foodpanda TEXT,
-        grabfood TEXT,
-        representation TEXT,
-        comment TEXT,
-        synced INTEGER DEFAULT 0,
-        last_sync_attempt TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS rbotransactionsalestrans (
+      CREATE TABLE IF NOT EXISTS attendance_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        transactionid TEXT,
-        linenum INTEGER,
-        receiptid TEXT,
-        itemid TEXT,
-        itemname TEXT,
-        itemgroup TEXT,
-        price TEXT,
-        netprice TEXT,
-        qty INTEGER,
-        discamount TEXT,
-        costamount TEXT,
-        netamount TEXT,
-        grossamount TEXT,
-        custaccount TEXT,
-        store TEXT,
-        priceoverride INTEGER,
-        staff TEXT,
-        paymentmethod TEXT,
-        linedscamount TEXT,
-        linediscpct TEXT,
-        custdiscamount TEXT,
-        unit TEXT,
-        unitqty TEXT,
-        unitprice TEXT,
-        taxamount TEXT,
-        createddate TEXT,
-        remarks TEXT,
-        taxinclinprice TEXT,
-        description TEXT,
-        netamountnotincltax TEXT,
-        inventbatchid TEXT,
-        inventbatchexpdate TEXT,
-        giftcard TEXT,
-        returntransactionid TEXT,
-        returnqty INTEGER,
-        creditmemonumber TEXT,
-        returnlineid TEXT,
-        priceunit TEXT,
-        storetaxgroup TEXT,
-        currency TEXT,
-        taxexempt TEXT,
-        discofferid TEXT,
+        staffId TEXT NOT NULL,
+        storeId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        timeIn TEXT,
+        timeInPhoto TEXT,
+        breakIn TEXT,
+        breakInPhoto TEXT,
+        breakOut TEXT,
+        breakOutPhoto TEXT,
+        timeOut TEXT,
+        timeOutPhoto TEXT,
+        status TEXT DEFAULT 'ACTIVE',
         synced INTEGER DEFAULT 0,
-        last_sync_attempt TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(transactionid, linenum)
-      )
-    `);
-    
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS sync_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        entity_type TEXT NOT NULL,
-        entity_id TEXT NOT NULL,
-        action TEXT NOT NULL,
-        payload TEXT,
-        status TEXT DEFAULT 'pending',
-        error_message TEXT,
-        retry_count INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        UNIQUE(staffId, date)
       )
     `);
     
     // Create indexes for faster lookups
     await db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_transactiontables_receiptid ON rbotransactiontables(receiptid);
-      CREATE INDEX IF NOT EXISTS idx_transactiontables_store ON rbotransactiontables(store);
-      CREATE INDEX IF NOT EXISTS idx_transactiontables_synced ON rbotransactiontables(synced);
-      
-      CREATE INDEX IF NOT EXISTS idx_salestrans_transactionid ON rbotransactionsalestrans(transactionid);
-      CREATE INDEX IF NOT EXISTS idx_salestrans_receiptid ON rbotransactionsalestrans(receiptid);
-      CREATE INDEX IF NOT EXISTS idx_salestrans_synced ON rbotransactionsalestrans(synced);
+      CREATE INDEX IF NOT EXISTS idx_attendance_staff_date ON attendance_records(staffId, date);
+      CREATE INDEX IF NOT EXISTS idx_attendance_store ON attendance_records(storeId);
+      CREATE INDEX IF NOT EXISTS idx_attendance_synced ON attendance_records(synced);
     `);
     
-    console.log('Database tables initialized successfully');
+    console.log('Attendance database table initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);
-    throw error;
+    console.log('Continuing without local database...');
+    // Don't throw error, just continue without database
   }
 }
 
 // Initialize the database
-initializeDatabase().catch(console.error);
+// initializeDatabase().catch(console.error);
 
 // Helper function for decimal formatting
 function formatDecimal(value) {
@@ -2192,10 +2103,10 @@ if (!fs.existsSync(uploadsDir)) {
 }
  const PORT = process.env.PORT || 3000;
 
-// app.listen(PORT, () => {
-//   console.log(`🚀 Server running on port ${PORT}`);
-//   console.log(`📡 API available at: http://localhost:${PORT}`);
-//   console.log(`🔗 Test endpoint: http://localhost:${PORT}/api/getsummary/lapaz`);
-// });
- // For Vercel, we need to export the app
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 API available at: http://localhost:${PORT}`);
+  console.log(`🔗 Test endpoint: http://localhost:${PORT}/api/getsummary/lapaz`);
+});
+//  For Vercel, we need to export the app
  module.exports = app;
