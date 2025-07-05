@@ -1316,7 +1316,7 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
           window_number: parseInt(transactionSummary.window_number || 0),
           taxinclinprice: parseFloat(transactionSummary.taxinclinprice || 0).toFixed(2),
           netamountnotincltax: parseFloat(transactionSummary.netamountnotincltax || 0).toFixed(2),
-          comment: transactionSummary.comment || "",
+        comment: truncateText(transactionSummary.comment || "", 50),
 
           // Payment methods - standardize to one property per payment type
           charge: String(parseFloat(transactionSummary.charge || '0.00').toFixed(2)),
@@ -1410,8 +1410,9 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
               taxamount: parseFloat(record.taxamount || 0).toFixed(2),
               
               createddate: record.createddate || new Date().toISOString(),
-              remarks: String(transactionSummary.comment || transactionSummary.remark || transactionSummary.remarks || ''),
-              comment: String(transactionSummary.comment || transactionSummary.remark || transactionSummary.remarks || ''),
+              remarks: truncateText(record.remarks || transactionSummary.comment || transactionSummary.remark || transactionSummary.remarks || '', 50),
+              comment: truncateText(record.remarks || transactionSummary.comment || transactionSummary.remark || transactionSummary.remarks || '', 50),
+
 
               taxinclinprice: parseFloat(record.taxamount || 0).toFixed(2),
               description: String(record.description || ''),
@@ -2117,3 +2118,7 @@ app.listen(PORT, () => {
 });
 //  For Vercel, we need to export the app
  module.exports = app;
+
+
+
+
