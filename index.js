@@ -8,6 +8,17 @@ const fs = require('fs');
 const app = express();
 const axios = require('axios');
 
+const multer = require('multer');
+const FormData = require('form-data');
+
+const upload = multer({
+  dest: 'uploads/temp/', // Temporary directory for uploaded files
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fieldSize: 10 * 1024 * 1024
+  }
+});
+
 // Configure body-parser to handle JSON with increased size limit
 app.use(bodyParser.json({limit: '10mb'}));
 app.use(bodyParser.urlencoded({extended: true, limit: '10mb'}));
@@ -2075,42 +2086,110 @@ app.get('/api/windowtable/get-all-tables', async (req, res) => {
  });
  
  // Attendance endpoint
- app.post('/api/attendance', async (req, res) => {
-  // Get the raw data
-  let chunks = [];
-  
-  req.on('data', chunk => {
-    chunks.push(chunk);
-  });
-  
-  req.on('end', async () => {
-    try {
-      const rawBody = Buffer.concat(chunks);
-      
-      // Forward the raw data
-      const response = await axios({
-        method: 'post',
-        url: `${API_BASE_URL}/attendance`,
-        data: rawBody,
-        headers: {
-          'Content-Type': req.headers['content-type'],
-          'Content-Length': req.headers['content-length']
+app.post('/api/attendance', upload.single('photo'), async (req, res) => {
+  try {
+    console.log('Received attendance request');
+    console.log('Body:', req.body);
+    console.log('File:', req.file);
+
+    // Validate required fields
+    const { staffId, storeId, date, time, type } = req.body;
+    
+    if (!staffId || !storeId || !date || !time || !type) {
+      return res.status(422).json({
+        success: false,
+        message: 'Missing required fields',
+        errors: {
+          staffId: !staffId ? ['Staff ID is required'] : null,
+          storeId: !storeId ? ['Store ID is required'] : null,
+          date: !date ? ['Date is required'] : null,
+          time: !time ? ['Time is required'] : null,
+          type: !type ? ['Type is required'] : null
         }
       });
-      
-      // Send back the response
-      res.status(200).json(response.data);
-      
-    } catch (error) {
-      console.error('Error:', error.message);
-      res.status(422).json({
+    }
+
+    if (!req.file) {
+      return res.status(422).json({
+        success: false,
+        message: 'Photo is required'
+      });
+    }
+
+    // Create form data for Laravel
+    const formData = new FormData();
+    formData.append('staffId', staffId);
+    formData.append('storeId', storeId);
+    formData.append('date', date);
+    formData.append('time', time);
+    formData.append('type', type);
+    
+    // Append the photo file
+    formData.append('photo', fs.createReadStream(req.file.path), {
+      filename: req.file.originalname || 'photo.jpg',
+      contentType: req.file.mimetype || 'image/jpeg'
+    });
+
+    console.log('Forwarding to Laravel...');
+
+    // Forward to Laravel
+    const response = await axios({
+      method: 'post',
+      url: `${API_BASE_URL}/attendance`,
+      data: formData,
+      headers: {
+        ...formData.getHeaders(),
+        'Accept': 'application/json'
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    });
+
+    console.log('Laravel response:', response.data);
+
+    // Clean up temporary file
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp file:', cleanupError);
+      }
+    }
+
+    // Send back the response
+    res.status(200).json(response.data);
+    
+  } catch (error) {
+    console.error('Error in attendance endpoint:', error);
+    
+    // Clean up temporary file on error
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp file:', cleanupError);
+      }
+    }
+
+    // Handle axios errors specifically
+    if (error.response) {
+      console.error('Laravel error response:', error.response.data);
+      res.status(error.response.status || 500).json(error.response.data);
+    } else {
+      res.status(500).json({
         success: false,
         message: 'Failed to process attendance',
         error: error.message
       });
     }
-  });
- });
+  }
+});
+
+// Make sure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads', 'temp');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
  const PORT = process.env.PORT || 3000;
 
 // app.listen(PORT, () => {
