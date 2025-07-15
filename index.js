@@ -11,6 +11,10 @@ const axios = require('axios');
 const multer = require('multer');
 const FormData = require('form-data');
 
+
+const API_BASE_URL = 'https://eljin.org/api';
+
+
 const upload = multer({
   storage: multer.memoryStorage(), // Use memory instead of disk
   limits: {
@@ -58,7 +62,9 @@ app.use((err, req, res, next) => {
 });
 
 // API Base URL
-const API_BASE_URL = 'https://eljin.org/api';
+
+
+
 
 // SQLite Database Setup
 const DB_PATH = path.join(__dirname, 'ecpos_data.db');
@@ -275,6 +281,117 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the ECPOS backend server with SQLite persistence!' });
 });
 
+
+ app.get('/api/users', async (req, res) => {
+    try {
+      const apiResponse = await axios.get(`${API_BASE_URL}/getallusers`, { timeout: 30000 });
+            // const apiResponse = await axios.get(`http://10.151.5.239:8000/api/getallusers`, { timeout: 90000 });
+
+      const users = apiResponse.data;
+  
+      if (!users || users.length === 0) {
+        return res.status(404).json({ error: 'No users found' });
+      }
+  
+      const transformedUsers = users.map(user => ({
+        id: user.id || 'Unknown',
+        name: user.name || 'Unknown User',
+        email: user.email || '',
+        storeid: user.storeid || '',
+        password: user.password || '',
+        two_factor_secret: user.two_factor_secret || null,
+        two_factor_recovery_codes: user.two_factor_recovery_codes || null,
+        remember_token: user.remember_token || null,
+        current_team_id: user.current_team_id || null,
+        profile_photo_path: user.profile_photo_path || null,
+        role: user.role || 'user'
+      }));
+  
+      res.status(200).json(transformedUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error.message);
+      if (error.response) {
+        res.status(error.response.status).json({ error: 'Error from external API', details: error.response.data });
+      } else if (error.request) {
+        res.status(503).json({ error: 'External API is unavailable' });
+      } else {
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+      }
+    }
+  });
+  // GET API endpoint to retrieve attendance records for a store
+app.get('/api/api-attendance/store/:storeId', async (req, res) => {
+  try {
+    console.log('Received attendance GET request for store:', req.params.storeId);
+    
+    const { storeId } = req.params;
+
+    // Validate storeId
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Store ID is required',
+        data: [],
+        count: 0,
+        store_id: null
+      });
+    }
+
+    console.log('Forwarding to Laravel...');
+
+    // Forward request to Laravel
+    const response = await axios({
+      method: 'get',
+      url: `${API_BASE_URL}/api-attendance/store/${storeId}`,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('Laravel response received:', {
+      status: response.status,
+      dataLength: response.data?.data?.length || 0
+    });
+
+    // Send back the response in the expected format
+    res.status(200).json({
+      success: true,
+      message: response.data.message || 'Store attendance records retrieved successfully.',
+      data: response.data.data || [],
+      count: response.data.count || response.data.data?.length || 0,
+      store_id: storeId.toLowerCase()
+    });
+    
+  } catch (error) {
+    console.error('Error in attendance GET endpoint:', error);
+
+    // Handle axios errors specifically
+    if (error.response) {
+      console.error('Laravel error response:', {
+        status: error.response.status,
+        data: error.response.data
+      });
+      
+      res.status(error.response.status || 500).json({
+        success: false,
+        message: error.response.data?.message || 'Failed to retrieve attendance records',
+        data: [],
+        count: 0,
+        store_id: storeId?.toLowerCase() || null
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve attendance records',
+        error: error.message,
+        data: [],
+        count: 0,
+        store_id: storeId?.toLowerCase() || null
+      });
+    }
+  }
+});
 // Z-Report endpoint
 app.post('/api/rbotransactiontables/:storeId/:zReportId', async (req, res) => {
     const { storeId, zReportId } = req.params;
@@ -1048,7 +1165,7 @@ app.get('/api/getdetails/:storeId', async (req, res) => {
         discount_rate: parseFloat(detail.linediscpct) || 0.0,
         total: parseFloat(detail.grossamount) || 0.0,
         receipt_number: detail.transactionid || "",
-        timestamp: new Date(detail.createddate).getTime(),
+        timestamp: detail.createddate || null,
         payment_method: detail.paymentmethod || "Cash",
         paymentMethod: detail.paymentmethod || "Cash",
         paymentmethod: detail.paymentmethod || "Cash",
@@ -1680,41 +1797,7 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
   });
   
   // Get users
-  app.get('/api/users', async (req, res) => {
-    try {
-      const apiResponse = await axios.get(`${API_BASE_URL}/getallusers`, { timeout: 30000 });
-      const users = apiResponse.data;
-  
-      if (!users || users.length === 0) {
-        return res.status(404).json({ error: 'No users found' });
-      }
-  
-      const transformedUsers = users.map(user => ({
-        id: user.id || 'Unknown',
-        name: user.name || 'Unknown User',
-        email: user.email || '',
-        storeid: user.storeid || '',
-        password: user.password || '',
-        two_factor_secret: user.two_factor_secret || null,
-        two_factor_recovery_codes: user.two_factor_recovery_codes || null,
-        remember_token: user.remember_token || null,
-        current_team_id: user.current_team_id || null,
-        profile_photo_path: user.profile_photo_path || null,
-        role: user.role || 'user'
-      }));
-  
-      res.status(200).json(transformedUsers);
-    } catch (error) {
-      console.error('Error fetching users:', error.message);
-      if (error.response) {
-        res.status(error.response.status).json({ error: 'Error from external API', details: error.response.data });
-      } else if (error.request) {
-        res.status(503).json({ error: 'External API is unavailable' });
-      } else {
-        res.status(500).json({ error: 'Internal server error', details: error.message });
-      }
-    }
-  });
+ 
   
   // Get products for a store
   app.get('/api/products/get-all-products', async (req, res) => {
@@ -1745,7 +1828,13 @@ app.get('/api/getStaffData/:storeId', async (req, res) => {
         barcode: product.barcode === 'N/A' ? 0 : parseInt(product.barcode, 10) || 0,
         foodpanda: product.foodpanda || 0,
         grabfood: product.grabfood || 0,
-        manilaprice: product.manilaprice || 0
+        manilaprice: product.manilaprice || 0,
+        mallprice: product.mallprice || 0,
+        grabfoodmall: product.grabfoodmall || 0,
+        foodpandamall: product.foodpandamall || 0
+        
+        
+      
       }));
   
       res.status(200).json(transformedProducts);
@@ -1886,7 +1975,17 @@ app.get('/api/windowtable/get-all-tables', async (req, res) => {
         id: parseInt(discount.ID || discount.id, 10) || 0,
         DISCOFFERNAME: (discount.DISCOFFERNAME || discount.discountOfferName || '').trim() || 'Unknown Discount',
         PARAMETER: parseInt(discount.PARAMETER || discount.parameter, 10) || 0,
-        DISCOUNTTYPE: ((discount.DISCOUNTTYPE || discount.discountType || '').toLowerCase() || 'unknown').trim()
+        DISCOUNTTYPE: ((discount.DISCOUNTTYPE || discount.discountType || '').toLowerCase() || 'unknown').trim(),
+
+        GRABFOOD_PARAMETER: parseInt(discount.GRABFOOD_PARAMETER || discount.GRABFOOD_PARAMETER, 10) || 0,
+        FOODPANDA_PARAMETER: parseInt(discount.FOODPANDA_PARAMETER || discount.FOODPANDA_PARAMETER, 10) || 0,
+        MANILAPRICE_PARAMETER: parseInt(discount.MANILAPRICE_PARAMETER || discount.MANILAPRICE_PARAMETER, 10) || 0,
+        MALLPRICE_PARAMETER: parseInt(discount.MALLPRICE_PARAMETER || discount.MALLPRICE_PARAMETER, 10) || 0,
+        GRABFOODMALL_PARAMETER: parseInt(discount.GRABFOODMALL_PARAMETER || discount.GRABFOODMALL_PARAMETER, 10) || 0,
+        FOODPANDAMALL_PARAMETER: parseInt(discount.FOODPANDAMALL_PARAMETER || discount.FOODPANDAMALL_PARAMETER, 10) || 0
+
+
+
       }));
   
       res.status(200).json(transformedDiscounts);
@@ -2117,11 +2216,12 @@ app.post('/api/attendance', upload.single('photo'), async (req, res) => {
 // Make sure uploads directory exists
 
  const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 API available at: http://localhost:${PORT}`);
-  console.log(`🔗 Test endpoint: http://localhost:${PORT}/api/getsummary/lapaz`);
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌐 API available at: http://localhost:${PORT}`);
+    console.log(`🔗 Network access at: http://10.151.5.145:${PORT}`);
+    console.log(`🧪 Test endpoint: http://localhost:${PORT}/api/getsummary/lapaz`);
 });
 //  For Vercel, we need to export the app
  module.exports = app;
